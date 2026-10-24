@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "skyrim-17",
+      "displayName": "Skyrim 1.7, CommonLibSSE-NG 7.2.0",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "VCPKG_OVERLAY_PORTS": "${sourceDir}/../cmake/ports/",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL",
+        "CMAKE_CXX_FLAGS": "/permissive- /Zc:preprocessor /EHsc -DWIN32_LEAN_AND_MEAN -DNOMINMAX -DUNICODE -D_UNICODE -UENABLE_SKYRIM_VR"
+      }
+    }
+  ]
+}
