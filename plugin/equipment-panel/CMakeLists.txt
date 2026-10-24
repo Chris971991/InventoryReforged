@@ -17,6 +17,10 @@ if(IR_DEBUG_EDITION)
 	list(APPEND sources ${debugSources})
 endif()
 
+# Dovakarn's build for its online server (DOVAKARN-BUILD.md): no SKSE Menu Framework pages (so no SKSEMenuFramework.h
+# is needed), hiding worn gear refused, and Skyrim 1.6.1170 only. OFF builds the mod as LayMovi ships it
+option(IR_DOVAKARN "build Dovakarn's online edition" ON)
+
 find_package(CommonLibSSE CONFIG REQUIRED)
 find_package(spdlog REQUIRED CONFIG)
 find_package(directxtk CONFIG REQUIRED)
@@ -24,9 +28,13 @@ find_package(nlohmann_json CONFIG REQUIRED)
 
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${sources})
 target_precompile_headers(${PROJECT_NAME} PRIVATE source/PCH.h)
-# include holds SKSEMenuFramework.h, the header SKSE Menu Framework gives the mods that draw pages in it
+# include holds SKSEMenuFramework.h, the header SKSE Menu Framework gives the mods that draw pages in it (only the
+# IR_DOVAKARN OFF build includes it)
 target_include_directories(${PROJECT_NAME} PRIVATE source include ../shared/source)
 target_link_libraries(${PROJECT_NAME} PRIVATE CommonLibSSE::CommonLibSSE spdlog::spdlog_header_only nlohmann_json::nlohmann_json)
 if(IR_DEBUG_EDITION)
 	target_compile_definitions(${PROJECT_NAME} PRIVATE IR_DEBUG_EDITION=1)
+endif()
+if(IR_DOVAKARN)
+	target_compile_definitions(${PROJECT_NAME} PRIVATE IR_DOVAKARN=1)
 endif()

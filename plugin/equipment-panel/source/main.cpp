@@ -1675,6 +1675,14 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 #else
 	SKSE::Init(a_skse);
 #endif
+#if IR_DOVAKARN
+	// Dovakarn: its build is made and checked for the one game its server runs, Skyrim 1.6.1170, and loads on no other
+	if (const auto runtime = a_skse->RuntimeVersion(); runtime != SKSE::RUNTIME_SSE_1_6_1170) {
+		logger::critical("Dovakarn's build of Inventory Reforged runs on Skyrim 1.6.1170 only, this game is {}: the plugin does not load",
+			runtime.string("."));
+		return false;
+	}
+#endif
 	// plugins load on the thread the game later runs its frames on, the message of loaded data comes from another one
 	Stacks::MainThreadIsThis();
 	Settings::Load();

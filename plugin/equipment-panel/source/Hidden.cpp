@@ -1375,8 +1375,32 @@ namespace Hidden
 		}
 	}
 
+#if IR_DOVAKARN
+	namespace
+	{
+		// Dovakarn: hiding worn gear is refused in its build whatever the panel's movie asks (the panel's SetHidden and
+		// SetHiddenPiece). A hidden piece vanished in the player's own game only, every other player still drew it from
+		// what the server says they wear. Showing a piece again stays, it only ever undoes a hide
+		bool RefusedHide(bool a_hidden)
+		{
+			if (a_hidden) {
+				static std::atomic<bool> told{ false };
+				if (!told.exchange(true)) {
+					logger::info("Dovakarn's build: hiding worn gear is refused");
+				}
+			}
+			return a_hidden;
+		}
+	}
+#endif
+
 	bool SetOn(RE::Actor& a_actor, std::int32_t a_slot, bool a_hidden)
 	{
+#if IR_DOVAKARN
+		if (RefusedHide(a_hidden)) {
+			return false;
+		}
+#endif
 		if (a_actor.IsPlayerRef()) {
 			return Set(a_slot, a_hidden);
 		}
@@ -1398,6 +1422,11 @@ namespace Hidden
 
 	void SetPieceOn(RE::Actor& a_actor, RE::FormID a_form, bool a_hidden)
 	{
+#if IR_DOVAKARN
+		if (RefusedHide(a_hidden)) {
+			return;
+		}
+#endif
 		if (a_actor.IsPlayerRef()) {
 			SetPiece(a_form, a_hidden);
 			return;
@@ -1499,6 +1528,10 @@ namespace Hidden
 				read.emplace(actor, std::move(kept));
 			}
 		}
+#if IR_DOVAKARN
+		// Dovakarn: nothing hidden comes back from a save either (SetOn)
+		read.clear();
+#endif
 		const std::scoped_lock hold{ followersLock };
 		followers = std::move(read);
 		anyFollowers = !followers.empty();
@@ -1529,6 +1562,12 @@ namespace Hidden
 				}
 			}
 		}
+#if IR_DOVAKARN
+		// Dovakarn: nothing hidden comes back from a save either (SetOn)
+		read = 0;
+		mask.store(0);
+		found.clear();
+#endif
 		StorePieces(std::move(found));
 		std::vector<Push> kept;
 		if (a_version >= 3 && a_save->ReadRecordData(count)) {

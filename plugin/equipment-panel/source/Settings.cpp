@@ -154,7 +154,10 @@ namespace Settings
 			a_values.accentColor = Color(a_lines, "Look", "iAccentColor", a_values.accentColor);
 			a_values.textColor = Color(a_lines, "Look", "iTextColor", a_values.textColor);
 			a_values.dumpPose = Switch(a_lines, "Debug", "bDumpPose", a_values.dumpPose);
+#if !IR_DOVAKARN
+			// Dovakarn: its build has no SKSE Menu Framework pages, so no window of them can be asked for (ModMenu.cpp)
 			a_values.pagesWindow = Switch(a_lines, "Debug", "bPagesWindow", a_values.pagesWindow);
+#endif
 #if IR_DEBUG_EDITION
 			a_values.stallSeconds = Whole(a_lines, "Debug", "iStallSeconds", a_values.stallSeconds, 0, 60);
 #endif

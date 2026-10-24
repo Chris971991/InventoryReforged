@@ -9,10 +9,16 @@
 #include "Subject.h"
 #include "Translations.h"
 
-#include "SKSEMenuFramework.h"
+// Dovakarn: its online server has no mod menu, so its build (IR_DOVAKARN) draws no pages in SKSE Menu Framework at all:
+// no pages.json is read, no section, page, key handler or test-stand window ([Debug] bPagesWindow) is registered, and the
+// framework's header is not needed. Reload, the settings read again after the journal closes, stays
+#if !IR_DOVAKARN
+#	include "SKSEMenuFramework.h"
+#endif
 
 namespace ModMenu
 {
+#if !IR_DOVAKARN
 	namespace
 	{
 		constexpr auto kPages = "Data/SKSE/Plugins/InventoryReforged/pages.json";
@@ -321,9 +327,13 @@ namespace ModMenu
 			}
 		}
 	}
+#endif
 
 	void Register()
 	{
+#if IR_DOVAKARN
+		logger::info("Dovakarn's build: no pages in SKSE Menu Framework");
+#else
 		if (!SKSEMenuFramework::IsInstalled()) {
 			return;
 		}
@@ -341,6 +351,7 @@ namespace ModMenu
 				logger::info("the pages are open in a window of their own for the test stand");
 			}
 		}
+#endif
 	}
 
 	void Reload()

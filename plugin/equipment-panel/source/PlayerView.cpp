@@ -2,6 +2,8 @@
 
 #include "PlayerView.h"
 
+#include <unordered_set>
+
 #include "Copy.h"
 #include "Hidden.h"
 #include "PlayerSize.h"
@@ -144,6 +146,26 @@ namespace PlayerView
 			return held;
 		}
 
+		// Dovakarn: the skeleton's "NPC" node and every node above it up to the doll are where a body mod moves the whole
+		// body (RaceMenu's high heels lift "NPC" by the heel height of the shoes worn). A change of gear changes that move
+		// for real, so those nodes are always taken from the new copy, never held from the one before
+		constexpr auto kWholeBodyNode = "NPC"sv;
+
+		std::unordered_set<const RE::NiAVObject*> WholeBodyMoves(RE::NiAVObject& a_doll)
+		{
+			std::unordered_set<const RE::NiAVObject*> moves;
+			Scene::Visit(a_doll, [&](RE::NiAVObject& a_part) {
+				const char* name = a_part.name.c_str();
+				if (!name || kWholeBodyNode != name) {
+					return;
+				}
+				for (const RE::NiAVObject* up = &a_part; up && up != &a_doll; up = up->parent) {
+					moves.insert(up);
+				}
+			});
+			return moves;
+		}
+
 		// the held turns and places go onto the new copy's nodes of those names, its scale stays the copy's own
 		void Restore(RE::NiAVObject& a_doll, const HeldPose& a_held)
 		{
@@ -158,11 +180,12 @@ namespace PlayerView
 					nodes.push_back(&a_part);
 				}
 			});
+			const auto wholeBody = WholeBodyMoves(a_doll);
 			std::size_t kept = 0;
 			for (auto* node : nodes) {
 				const std::string name = node->name.c_str();
 				const auto found = a_held.find(name);
-				if (found == a_held.end() || !found->second || seen[name] != 1) {
+				if (found == a_held.end() || !found->second || seen[name] != 1 || wholeBody.contains(node)) {
 					continue;
 				}
 				node->local.rotate = found->second->rotate;
@@ -231,7 +254,8 @@ namespace PlayerView
 		// idles move) is taken as the body has it that moment. For 3 s after a change of gear the doll is copied every
 		// 300 ms (Fresh), so those parts jumped to wherever the body had them, 2 to 3 times a second, and a running world
 		// under the menu (Skyrim Souls RE) made the doll look like it updated at 2 FPS. Each node named once keeps its
-		// turn and place from the copy before; what the new copy brings new (a piece just put on) is taken once
+		// turn and place from the copy before; what the new copy brings new (a piece just put on) is taken once. The "NPC"
+		// node and the nodes above it are always the new copy's (WholeBodyMoves: RaceMenu's high heels after new shoes)
 		const HeldPose held = copy && body == copiedBody ? Hold(*copy) : HeldPose{};
 		Hide();
 		placed = a_place;
