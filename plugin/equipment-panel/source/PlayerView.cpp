@@ -124,6 +124,58 @@ namespace PlayerView
 			copy->Update(update);
 		}
 
+		// Dovakarn: the local turn and place of every node of a doll whose name it holds once, by name. A name held twice
+		// (two pieces that bring a node of one name) can't be told apart in the next copy, it's left out
+		using HeldPose = std::unordered_map<std::string, std::optional<RE::NiTransform>>;
+
+		HeldPose Hold(RE::NiAVObject& a_doll)
+		{
+			HeldPose held;
+			Scene::Visit(a_doll, [&](RE::NiAVObject& a_part) {
+				const char* name = a_part.name.c_str();
+				if (&a_part == &a_doll || !a_part.AsNode() || !name || !*name) {
+					return;
+				}
+				const auto [at, added] = held.try_emplace(name, a_part.local);
+				if (!added) {
+					at->second.reset();
+				}
+			});
+			return held;
+		}
+
+		// the held turns and places go onto the new copy's nodes of those names, its scale stays the copy's own
+		void Restore(RE::NiAVObject& a_doll, const HeldPose& a_held)
+		{
+			if (a_held.empty()) {
+				return;
+			}
+			std::unordered_map<std::string, std::size_t> seen;
+			std::vector<RE::NiAVObject*> nodes;
+			Scene::Visit(a_doll, [&](RE::NiAVObject& a_part) {
+				const char* name = a_part.name.c_str();
+				if (&a_part != &a_doll && a_part.AsNode() && name && *name && ++seen[name] == 1) {
+					nodes.push_back(&a_part);
+				}
+			});
+			std::size_t kept = 0;
+			for (auto* node : nodes) {
+				const std::string name = node->name.c_str();
+				const auto found = a_held.find(name);
+				if (found == a_held.end() || !found->second || seen[name] != 1) {
+					continue;
+				}
+				node->local.rotate = found->second->rotate;
+				node->local.translate = found->second->translate;
+				++kept;
+			}
+			static std::size_t told = 0;
+			if (told < 3) {
+				++told;
+				logger::info("the doll copied again keeps the pose of the copy before on {} nodes", kept);
+			}
+		}
+
 		// the copy faces the menu camera, as large as its room lets a body of this size be, then as the player sized
 		// and moved it. Gives back the part of the screen the body takes
 		Scene::Box Stand(const PlayerSize::Size& a_size)
@@ -174,6 +226,13 @@ namespace PlayerView
 		if (copy && makeup == copied && body == copiedBody && !moved && !Fresh()) {
 			return false;
 		}
+		// Dovakarn: the doll keeps the pose it was made in when it is copied again from the same body. Only the bones
+		// of the standing pose are set on a copy, every other node (skirt and cloak bones, fingers, the bones physics and
+		// idles move) is taken as the body has it that moment. For 3 s after a change of gear the doll is copied every
+		// 300 ms (Fresh), so those parts jumped to wherever the body had them, 2 to 3 times a second, and a running world
+		// under the menu (Skyrim Souls RE) made the doll look like it updated at 2 FPS. Each node named once keeps its
+		// turn and place from the copy before; what the new copy brings new (a piece just put on) is taken once
+		const HeldPose held = copy && body == copiedBody ? Hold(*copy) : HeldPose{};
 		Hide();
 		placed = a_place;
 		looked = Wanted();
@@ -207,6 +266,7 @@ namespace PlayerView
 		if (Pose::KeepsWorldPose() || !Pose::Stand(*copy, Female(*shown))) {
 			Pose::LookAhead(*copy, *shown);
 		}
+		Restore(*copy, held);
 		Pose::Tell(*body, *copy, *shown);
 		// the windows and menus of the panel lie over the doll, so it's drawn under the menu
 		Scene::Add(*copy, Stand(PlayerSize::Of(*shown, *body)), Scene::Layer::kUnder);

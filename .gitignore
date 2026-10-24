@@ -1,0 +1,4 @@
+plugin/equipment-panel/build/
+plugin/equipment-panel/include/
+vcpkg/
+build.log
