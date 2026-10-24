@@ -1,0 +1,435 @@
+{
+  "modName": "InventoryReforged",
+  "displayName": "Inventory Reforged",
+  "minMcmVersion": 2,
+  "pluginRequirements": ["InventoryReforged.esp"],
+  "pages": [
+    {
+      "pageDisplayName": "Panel",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        { "text": "Panel", "type": "header" },
+        {
+          "id": "bEnabled:Panel",
+          "text": "Use the equipment panel",
+          "type": "toggle",
+          "help": "Off leaves the item menus of SkyUI exactly as they are and shows the pieces of hidden slots on your character while it stays off. The hidden slots are remembered and hide again when the panel is back on. Takes effect when the menu closes.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bStillCamera:Panel",
+          "text": "Keep the camera still",
+          "type": "toggle",
+          "help": "For mods that keep the world running while a menu is open, like Skyrim Souls RE. While the inventory is open, the pointer at an edge of the screen or a pushed stick no longer turns the camera behind the panel. Changes nothing when the game pauses in menus.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bFollowers:Panel",
+          "text": "Panel in a follower's trade",
+          "type": "toggle",
+          "help": "When you trade with a follower, the panel shows the follower: their doll, what they wear in the slots, and an item dragged into a slot goes on them. Works for any follower and any mod that opens a follower's inventory the game's way.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bCompanionTabs:Panel",
+          "text": "Tabs to switch to followers",
+          "type": "toggle",
+          "help": "Tabs over your character: YOU and each follower near you, nearest first. A click in your inventory opens that follower's trade, a click in a trade opens another follower's or your own inventory. They show only when a follower is near enough to be loaded. Takes effect the next time the menu opens.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bMagicMenu:Panel",
+          "text": "Panel in the magic menu",
+          "type": "toggle",
+          "help": "Your character in the magic menu between the slots of your two hands and your voice, with the spell, weapon or shout each one holds. A click on a slot narrows the list to what can go there, and a spell picked then goes into that hand. A double click on a hand takes a weapon, shield or torch off. Takes effect the next time the menu opens.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "text": "Let every follower be dressed again",
+          "type": "text",
+          "help": "A mod can ask the panel to leave a follower's gear as it is for a while, a quest's disguise say. If that mod is gone and a follower still can't be dressed in the panel, this lets every follower be dressed again.",
+          "action": { "type": "CallFunction", "function": "DressFollowersAgain" }
+        },
+        {
+          "id": "iListWidth:Panel",
+          "text": "Item list width",
+          "type": "enum",
+          "help": "How wide the item list of the inventory is. A narrower list cuts long names sooner and gives its room to the slots and your character. Also set in the inventory with the sliders button in the bottom bar, where you see it change.",
+          "valueOptions": { "options": ["Full", "Narrow", "Narrower"], "sourceType": "ModSettingInt" }
+        },
+        { "text": "Character", "type": "header" },
+        {
+          "id": "bShow:Doll",
+          "text": "Show the character",
+          "type": "toggle",
+          "help": "Your character in 3D between the two columns of slots, with everything you wear.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "iPose:Doll",
+          "text": "Pose",
+          "type": "enum",
+          "help": "Standing: the character always stands calm and straight, even when you open the menu on a horse, sitting or mid swing. As in the world: the pose of the moment you opened the menu, with only the head and spine turned straight. In first person the character stands either way, the body plays a stance made for the camera there.",
+          "valueOptions": { "options": ["Standing", "As in the world"], "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "fTurnSpeed:Doll",
+          "text": "Turn speed",
+          "type": "slider",
+          "help": "Drag across the character to turn it. Degrees it turns for every pixel the mouse moves.",
+          "valueOptions": { "min": 0.1, "max": 2.0, "step": 0.05, "formatString": "{2}", "sourceType": "ModSettingFloat" }
+        },
+        {
+          "id": "bEquipMotion:Doll",
+          "text": "Equipping animations",
+          "type": "toggle",
+          "help": "With a mod of equipping animations, Immersive Equipping Animations and the like, the character plays the animation as you put a piece on or take it off. Once the inventory closes your character in the world plays it too, as without the panel.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "iScale:Doll",
+          "text": "Character size",
+          "type": "slider",
+          "help": "The size of your character in percent of the size that fits between the slots. Also set in the inventory with the sliders button in the bottom bar, where you see it change.",
+          "valueOptions": { "min": 60, "max": 140, "step": 5, "formatString": "{0}%", "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "iShiftRight:Doll",
+          "text": "Character to the right",
+          "type": "slider",
+          "help": "Moves your character to the right of the middle of its room, below zero to the left, in percent of the room's width.",
+          "valueOptions": { "min": -40, "max": 40, "step": 5, "formatString": "{0}%", "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "iShiftUp:Doll",
+          "text": "Character up",
+          "type": "slider",
+          "help": "Moves your character up from the middle of its room, below zero down, in percent of the room's height.",
+          "valueOptions": { "min": -40, "max": 40, "step": 5, "formatString": "{0}%", "sourceType": "ModSettingInt" }
+        },
+        { "text": "Colours", "type": "header" },
+        {
+          "id": "iAccentColor:Look",
+          "text": "Accent colour",
+          "type": "color",
+          "help": "The colour of what is picked, lit or counted: the frame of a chosen slot, lit buttons and eyes, tabs, headings of the character drawer and the numbers beside slot names. Gold by default, pick one that sits with your UI. Takes effect the next time you open the menu.",
+          "valueOptions": { "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "iTextColor:Look",
+          "text": "Text colour",
+          "type": "color",
+          "help": "The colour of names, signs and buttons at rest. Pale parchment by default. Takes effect the next time you open the menu.",
+          "valueOptions": { "sourceType": "ModSettingInt" }
+        },
+        { "text": "Slots", "type": "header" },
+        {
+          "id": "bModels:Slots",
+          "text": "3D models in the slots",
+          "type": "toggle",
+          "help": "Each slot shows the model of what you wear there. Off shows flat signs.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bWornLook:Slots",
+          "text": "Armor as it sits on the body",
+          "type": "toggle",
+          "help": "Helmets, armor, gloves, boots, cloaks and jewelry are shown standing, the way they sit on you. Off shows the model the item has on the ground.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bHideIcons:Slots",
+          "text": "Hide buttons",
+          "type": "toggle",
+          "help": "A small eye in the corner of a slot hides what you wear there on your character, in the world too. It stays worn and keeps protecting you. The eye of a small slot in a strip hides that piece alone. Hidden slots and pieces are saved with your game.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bPopup:Slots",
+          "text": "Item window on a click",
+          "type": "toggle",
+          "help": "A click on a slot opens the window of what you wear there beside the slot, and selects it in the list when the list shows it. The list keeps its category, subcategories and search. A click anywhere else closes the window. Off only selects the item, a slot whose item the list doesn't show still opens its window.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bDoubleClickTakesOff:Slots",
+          "text": "Double click takes off",
+          "type": "toggle",
+          "help": "A double click on a slot takes off what you wear there.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bDragAndDrop:Slots",
+          "text": "Drag items onto slots",
+          "type": "toggle",
+          "help": "Drag a row of the list onto a slot or onto your character to put it on. A one handed weapon dropped on the left hand goes into the left hand.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bPieceStrips:Slots",
+          "text": "Strips of pieces",
+          "type": "toggle",
+          "help": "A slot that holds more than one piece (a cloak, a bag and a lamp in Other, rings of several fingers) pulls out a strip of small slots when its tab is clicked: an empty one first that takes a dragged item, then one for every piece. Each can be opened, hidden, taken off or dropped on like a slot. Arrows and the wheel scroll a long strip, a click elsewhere, its handle or Esc put it back.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Slots on the panel", "type": "header" },
+        {
+          "id": "bShowRight:Slots",
+          "text": "Right hand",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowLeft:Slots",
+          "text": "Left hand",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowAmmo:Slots",
+          "text": "Ammo",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowAmulet:Slots",
+          "text": "Neck",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowRing:Slots",
+          "text": "Ring",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowHead:Slots",
+          "text": "Head",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowBody:Slots",
+          "text": "Body",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowHands:Slots",
+          "text": "Hands",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowFeet:Slots",
+          "text": "Feet",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bShowOther:Slots",
+          "text": "Other",
+          "type": "toggle",
+          "help": "Off takes this slot off the panel, its place stays empty. What you wear there stays worn.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Hidden on the character", "type": "header" },
+        {
+          "text": "Show everything again",
+          "type": "text",
+          "help": "Every hidden slot and piece is shown on your character again.",
+          "action": { "type": "CallFunction", "function": "ShowEverything" }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "Item list",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        { "text": "Comparison", "type": "header" },
+        {
+          "id": "bArrows:List",
+          "text": "Compare with what you wear",
+          "type": "toggle",
+          "help": "A green arrow and +N or a red arrow and -N after the name of an item you could wear: how much more or less armor or damage it gives than what you wear in its place. Ammo only counts while a bow or crossbow is in your hands, a bow is weighed against a bow and a sword against a melee weapon.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bEqualSign:List",
+          "text": "Grey = for equal items",
+          "type": "toggle",
+          "help": "An item that gives exactly what you wear gets a grey equals sign instead of nothing.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bBadges:List",
+          "text": "Slot signs on rows",
+          "type": "toggle",
+          "help": "A row of something you could wear shows the sign of the slot it goes to.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Finding things", "type": "header" },
+        {
+          "id": "bSubcategories:List",
+          "text": "Subcategories",
+          "type": "toggle",
+          "help": "A strip under the category icons. Weapons: one handed, two handed, bows, staves, ammo. Apparel: light, heavy, clothing, jewelry, shields, and a second group head, body, hands, feet, other; two groups add up. Potions: health, magicka, stamina, poisons. Food and drinks. Books, notes, maps, spell tomes. Ore, ingots, gems, soul gems, pelts.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bLastAdded:List",
+          "text": "Sort by last added",
+          "type": "toggle",
+          "help": "The name column gets a LAST ADDED state: what you got last comes first.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bStackWeight:List",
+          "text": "Weight of whole stacks",
+          "type": "toggle",
+          "help": "The weight column gets SUMW states: the weight of a whole stack instead of one item.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bNewMarks:List",
+          "text": "Mark new items",
+          "type": "toggle",
+          "help": "A small dot on what you got since you last closed the inventory, on its row and on its subcategory. It goes when the pointer passes the row or when the inventory closes.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bQuestMarks:List",
+          "text": "Mark quest items",
+          "type": "toggle",
+          "help": "A small arrowhead after the name of what a quest wants: gold while a quest still needs it, a dimmer gold when a quest that hasn't begun will, grey once its quest is done and you may let it go. The line of the item window that names the quest is Quest line on the Item window page.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bStolenApart:List",
+          "text": "Stolen items apart",
+          "type": "toggle",
+          "help": "Stolen copies of an item get a row of their own beside the ones that are yours, in your inventory and in chests, so you see what is stolen and store, take, sell or drop just those. A merchant's or a follower's things stay as they are. Needs game 1.6 or later.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Moving items", "type": "header" },
+        {
+          "id": "bRowMenu:List",
+          "text": "Right click opens the item menu",
+          "type": "toggle",
+          "help": "A right click on a row opens a small menu: equip, equip in the left hand, use, favorite, inspect, and drop, take, store, buy or sell one, all or some. Off gives the right click back to the game, which equips in the left hand.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "iStackKey:List",
+          "text": "Move the whole stack",
+          "type": "keymap",
+          "help": "In a container or a shop this key moves the whole stack of the row under the pointer at once, with no slider: take, store, buy or sell all of it.",
+          "valueOptions": { "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "bWeightWarnings:List",
+          "text": "Weight warnings",
+          "type": "toggle",
+          "help": "In a chest or a shop the weight of a row turns red when taking one would slow you and amber when taking all of it would. The menu of a subcategory tells what it weighs.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Junk", "type": "header" },
+        {
+          "id": "bJunk:List",
+          "text": "Junk marks",
+          "type": "toggle",
+          "help": "The menu of a row or the junk key marks an item as junk, every copy of it. In a shop one press sells all your junk, in a chest it stores it. What you wear, your favorites and anything a quest wants are never taken.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "iJunkKey:List",
+          "text": "Junk key",
+          "type": "keymap",
+          "help": "Marks the row under the pointer as junk, or takes the mark off.",
+          "valueOptions": { "sourceType": "ModSettingInt" }
+        }
+      ]
+    },
+    {
+      "pageDisplayName": "Item window",
+      "cursorFillMode": "topToBottom",
+      "content": [
+        { "text": "Item window", "type": "header" },
+        {
+          "id": "iShow:Window",
+          "text": "Window pops up",
+          "type": "enum",
+          "help": "When the item window with its card comes up over the row under the pointer. On hover: at once. After a pause: once the pointer rests on a row a moment, so moving over the list shows nothing. Never: no window over the rows, a click on a slot still opens its window and the inspect view still shows any item big. Also set in the inventory with the sliders button in the bottom bar.",
+          "valueOptions": { "options": ["On hover", "After a pause", "Never"], "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "iSize:Window",
+          "text": "Window size",
+          "type": "slider",
+          "help": "The window of an item with its card, in percent. At 100 it takes about half the item list and never gets smaller than four tenths of the screen's height, so it reads on any screen. Make it bigger when the words of the card are too small for your screen, as on a TV across the room or a small handheld. It stops where the names of the rows would be covered. Also set in the inventory with the sliders button in the bottom bar.",
+          "valueOptions": { "min": 70, "max": 160, "step": 10, "formatString": "{0}%", "sourceType": "ModSettingInt" }
+        },
+        {
+          "id": "bStats:Window",
+          "text": "Combat numbers",
+          "type": "toggle",
+          "help": "Weapons show swing time, damage per second and per minute, reach, stagger and crit damage. Armor shows the share of a hit it stops, what the whole set stops and how much longer you last.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bHeroStats:Window",
+          "text": "Character drawer",
+          "type": "toggle",
+          "help": "A small tab at the feet of your character pulls your numbers up over it: level, health, magicka and stamina with how fast they come back, armor and resistances, swing time and damage a second of your weapon, speed, carry weight, what your gear weighs and how much of it slows you, sneak and power attacks, what enchantments and potions add to your skills, the spells in your hands, your bounties, and at the bottom the blessings, diseases and other effects on you. Click the tab or drag it as far as you like, the wheel scrolls. It stays out, the next time you open the menu too, until you push it back with the tab. Nothing is counted while it is in.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bSlotNumbers:Window",
+          "text": "Body slot numbers",
+          "type": "toggle",
+          "help": "The window of anything you wear shows a small grey line with the body slots it takes, like Slots 32, 46. Handy with modular armor: pauldrons, belts and capes sit on slots 44 to 61, and two pieces on one slot push each other off.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bQuietTags:Window",
+          "text": "Quiet tags",
+          "type": "toggle",
+          "help": "The kind under the name, like Heavy, Body, and small grey lines under the numbers: how many you already have when it lies in a chest or a shop, silver, and the plugin it comes from when that is not the game itself. Quests have switches of their own, Quest line below and Mark quest items on the List page.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bQuestLine:Window",
+          "text": "Quest line",
+          "type": "toggle",
+          "help": "A line under the numbers of what a quest wants: which quest, and whether it still needs the item or is done with it. The arrowhead after the name of the row is Mark quest items on the List page. With both off the mod reads nothing of the quests.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        {
+          "id": "bModOrigin:Window",
+          "text": "Mod an item comes from",
+          "type": "toggle",
+          "help": "The quiet line From and the plugin's file under the numbers of an item a mod adds. Off hides just this line, the other quiet tags stay.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        },
+        { "text": "Inspect", "type": "header" },
+        {
+          "id": "bOnZoomKey:Inspect",
+          "text": "Zoom key opens the inspect view",
+          "type": "toggle",
+          "help": "The item zoom key of the game opens the full screen inspect view: drag to turn the item any way, the wheel brings it closer. Off leaves the game's own zoom.",
+          "valueOptions": { "sourceType": "ModSettingBool" }
+        }
+      ]
+    }
+  ]
+}
