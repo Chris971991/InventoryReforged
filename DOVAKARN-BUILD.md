@@ -34,7 +34,11 @@ which then needs `SKSEMenuFramework.h`, see Build), except the doll's pose, whic
   effect's; never an editor marker), and every frame of the item, container, magic, barter and gift menus each such slot
   model in sight is updated with the game's clock (`NiAVObject::Update`, time `GetDurationOfApplicationRunTime() / 1000`,
   dirty) as `Inventory3DManager::Render` updates the game's own preview, so its particles and controllers play. Before,
-  a spell or a shout got no slot model, and no slot model was ever ticked.
+  a spell or a shout got no slot model, and no slot model was ever ticked. At its first frame the art has no particles
+  and is sized by its glow alone (Flames' fire stood at a third of its square), so from 0.5 to 1.2 s of play the places
+  of its live particles are gathered and it is fitted again to their core (the 10th to 90th percentile each way, 1.05
+  of the square, every shape at most 2.4 times the square; a growth outside 0.5 to 3 is a bad measure and not made;
+  ribbon systems, `BSStripParticleSystem`, are left out). The log says both measures (`effect art ...`).
 - **Skyrim 1.6.1170 only** (`main.cpp`, `SKSEPluginLoad`): on any other game version the plugin writes one line to
   `InventoryReforged.log` ("runs on Skyrim 1.6.1170 only, this game is ...") and does not load. It is built and checked
   for the one game version Dovakarn's server runs.

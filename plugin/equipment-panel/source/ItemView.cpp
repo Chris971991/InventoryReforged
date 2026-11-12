@@ -73,6 +73,18 @@ namespace ItemView
 			bool asWorn = false;
 			// a spell's, a power's or a shout's menu display object: its particles and controllers run by the game's clock
 			bool clocked = false;
+			// effect art is fitted again once it has played a moment (Animate, Refit): where its particles went meanwhile,
+			// across the screen and up it, and how deep on average
+			std::chrono::steady_clock::time_point builtAt;
+			bool settled = false;
+			struct Spread
+			{
+				std::vector<float> across;
+				std::vector<float> up;
+				double deep = 0.0;
+				double radius = 0.0;
+				std::size_t points = 0;
+			} spread;
 		};
 
 		std::vector<Shown> shown;
@@ -617,6 +629,10 @@ namespace ItemView
 					a_shown.model = model;
 					a_shown.asWorn = false;
 					a_shown.clocked = DisplayObject(*form) != nullptr;
+					if (a_shown.clocked) {
+						a_shown.builtAt = std::chrono::steady_clock::now();
+						logger::info("effect art of {:08X} {} in slot {}, at its first frame: {}", form->GetFormID(), form->GetName(), slot.index, Scene::TellMeasure(*model));
+					}
 				}
 			}
 			if (a_shown.model) {
@@ -1020,6 +1036,120 @@ namespace ItemView
 	// 0x140927560 updates its newest model with NiUpdateData{ GetDurationOfApplicationRunTime() / 1000, dirty }), and
 	// nothing else ticks a model the plugin put in the scene. Without it the art's particles never leave their emitters
 	// and its turns and glows stand at their first frame. A slot out of sight is left alone
+	namespace
+	{
+		// Effect art has no size of its own until it plays: at its first frame no particle is out and the bounds are the
+		// ones its file was saved with (Flames' glow cylinder alone sized it, its fire stood at a third of the square).
+		// From kWatchFrom to kSettleAfter of play where its particles go is gathered, then it is fitted again by that
+		constexpr auto kWatchFrom = std::chrono::milliseconds(500);
+		constexpr auto kSettleAfter = std::chrono::milliseconds(1200);
+		// share of the square the art's core fills, as a weapon's model fills it (WornView kFill)
+		constexpr float kEffectFill = 1.05F;
+		// The core is where most particles are: the places between these shares of them, each way. Flames' faint rising
+		// trail reached the whole square while its bright fire stood at a third of it
+		constexpr float kCoreFrom = 0.1F;
+		constexpr float kCoreTo = 0.9F;
+		// the glow and rays around the core may reach past the frame, every shape at most this many times the square
+		constexpr float kMostSpill = 2.4F;
+		// a refit outside this is a measure gone wrong and is not made; one this close to the size it has is left alone
+		constexpr float kLeastGrow = 0.5F;
+		constexpr float kMostGrow = 3.0F;
+		constexpr float kRefitTolerance = 0.08F;
+		// a particle system read here holds this many at most, and the places kept for one slot are this many at most
+		constexpr std::uint16_t kMostParticles = 2048;
+		constexpr std::size_t kMostPlaces = 8192;
+
+		float Share(std::vector<float>& a_values, float a_share)
+		{
+			const auto at = static_cast<std::size_t>(a_share * static_cast<float>(a_values.size() - 1));
+			std::nth_element(a_values.begin(), a_values.begin() + static_cast<std::ptrdiff_t>(at), a_values.end());
+			return a_values[at];
+		}
+
+		// where each live particle of the art is now, added to what was seen before. A particle system keeps its particles
+		// in its own space unless it says the world's. A strip system (BSStripParticleSystem) keeps the points of its
+		// ribbons there and read as nonsense (3256 wide in Healing's art), it is left out
+		void Gather(RE::NiAVObject& a_model, Shown::Spread& a_spread)
+		{
+			const auto axes = Scene::Camera();
+			Scene::Visit(a_model, [&](RE::NiAVObject& a_part) {
+				auto* system = netimmerse_cast<RE::NiParticleSystem*>(&a_part);
+				if (!system || system->GetAppCulled() || netimmerse_cast<RE::BSStripParticleSystem*>(&a_part)) {
+					return;
+				}
+				auto* data = system->GetParticlesRuntimeData().particleData.get();
+				if (!data) {
+					return;
+				}
+				auto& held = data->GetParticlesRuntimeData();
+				const auto count = std::min({ data->GetActiveVertexCount(), held.maxNumVertices, kMostParticles });
+				if (!held.positions || count == 0) {
+					return;
+				}
+				const bool inWorld = system->GetParticleSystemRuntimeData().isWorldspace;
+				for (std::uint16_t i = 0; i < count && a_spread.across.size() < kMostPlaces; ++i) {
+					const auto at = inWorld ? held.positions[i] : system->world * held.positions[i];
+					const float radius = (held.radii ? held.radii[i] : 0.0F) * (held.sizes ? held.sizes[i] : 1.0F) * (inWorld ? 1.0F : system->world.scale);
+					if (!std::isfinite(at.x) || !std::isfinite(at.y) || !std::isfinite(at.z) || !std::isfinite(radius)) {
+						continue;
+					}
+					a_spread.across.push_back(at.Dot(axes.right));
+					a_spread.up.push_back(at.Dot(axes.up));
+					a_spread.deep += at.Dot(axes.look);
+					a_spread.radius += radius;
+					++a_spread.points;
+				}
+			});
+		}
+
+		// The art is fitted to its square again by its core (every shape when it showed no particle), the glow around it
+		// held to kMostSpill. Scaled about its place and moved so the core stands in the middle of the square, without
+		// going back to time 0
+		void Refit(Shown& a_one, RE::NiUpdateData& a_now)
+		{
+			auto& model = *a_one.model;
+			auto& spread = a_one.spread;
+			const auto axes = Scene::Camera();
+			const auto shapes = Scene::Measure(model);
+			Scene::Extent extent = shapes;
+			if (spread.points >= 8) {
+				const float size = static_cast<float>(spread.radius / static_cast<double>(spread.points));
+				const float left = Share(spread.across, kCoreFrom) - size;
+				const float right = Share(spread.across, kCoreTo) + size;
+				const float low = Share(spread.up, kCoreFrom) - size;
+				const float high = Share(spread.up, kCoreTo) + size;
+				if (right > left && high > low) {
+					extent.found = true;
+					extent.wide = right - left;
+					extent.high = high - low;
+					extent.middle = axes.right * ((left + right) / 2.0F) + axes.up * ((low + high) / 2.0F) +
+					                axes.look * static_cast<float>(spread.deep / static_cast<double>(spread.points));
+				}
+			}
+			const auto places = spread.points;
+			spread = {};
+			if (!extent.found) {
+				logger::info("effect art in slot {} after it played: nothing measured", a_one.slot.index);
+				return;
+			}
+			const float square = Scene::Length(a_one.slot.size);
+			float grow = kEffectFill * square / std::max({ extent.wide, extent.high, 0.01F });
+			if (shapes.found) {
+				grow = std::min(grow, kMostSpill * square / std::max({ shapes.wide, shapes.high, 0.01F }));
+			}
+			logger::info("effect art in slot {} after it played: core of {} particle places {:.1f} x {:.1f}, every shape {:.1f} x {:.1f}, square {:.1f}; {:.2f} times its size",
+				a_one.slot.index, places, extent.wide, extent.high, shapes.wide, shapes.high, square, grow);
+			if (grow < kLeastGrow || grow > kMostGrow || std::abs(grow - 1.0F) < kRefitTolerance) {
+				return;
+			}
+			const auto origin = model.local.translate;
+			const auto middle = origin + (extent.middle - origin) * grow;
+			model.local.scale *= grow;
+			model.local.translate = origin + (Scene::Point(a_one.slot.centerX, a_one.slot.centerY) - middle);
+			model.Update(a_now);
+		}
+	}
+
 	void Animate()
 	{
 		if (std::ranges::none_of(shown, [](const Shown& a_one) { return a_one.clocked && a_one.model; })) {
@@ -1030,9 +1160,21 @@ namespace ItemView
 		RE::NiUpdateData update;
 		update.time = static_cast<float>(RE::GetDurationOfApplicationRunTime()) * 0.001F;
 		update.flags = RE::NiUpdateData::Flag::kDirty;
+		const auto now = std::chrono::steady_clock::now();
 		for (auto& one : shown) {
 			if (one.clocked && one.model && !one.model->GetAppCulled()) {
 				one.model->Update(update);
+				if (one.settled) {
+					continue;
+				}
+				const auto played = now - one.builtAt;
+				if (played >= kWatchFrom) {
+					Gather(*one.model, one.spread);
+				}
+				if (played >= kSettleAfter) {
+					one.settled = true;
+					Refit(one, update);
+				}
 			}
 		}
 	}
