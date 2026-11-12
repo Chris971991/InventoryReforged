@@ -1246,6 +1246,7 @@ namespace
 	{
 		static void thunk(RE::IMenu* a_menu)
 		{
+			ItemView::Animate();
 			if constexpr (std::is_same_v<Menu, RE::ContainerMenu>) {
 				Recharge::Frame();
 				if (!Subject::Other()) {
@@ -1290,6 +1291,27 @@ namespace
 				Scene::DrawnUnder();
 			}
 			Eyes::Display();
+		}
+
+		static void Install()
+		{
+			constexpr std::size_t kPostDisplay = 6;
+			REL::Relocation<std::uintptr_t> table{ Menu::VTABLE[0] };
+			original = table.write_vfunc(kPostDisplay, thunk);
+		}
+
+		static inline REL::Relocation<decltype(thunk)> original;
+	};
+
+	// A shop and a gift draw their 3D themselves and have no frame of the panel's above, their slots' effect art gets the
+	// game's clock here before the menu draws
+	template <class Menu>
+	struct SlotClock
+	{
+		static void thunk(RE::IMenu* a_menu)
+		{
+			ItemView::Animate();
+			original(a_menu);
 		}
 
 		static void Install()
@@ -1696,6 +1718,8 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	MenuDisplay<RE::InventoryMenu>::Install();
 	MenuDisplay<RE::ContainerMenu>::Install();
 	MenuDisplay<RE::MagicMenu>::Install();
+	SlotClock<RE::BarterMenu>::Install();
+	SlotClock<RE::GiftMenu>::Install();
 #if IR_DEBUG_EDITION
 	// after ZoomKey, it looks for the game's own handler in slot 4 of the inventory's and the container menu's tables
 	MenuSteps<RE::InventoryMenu>::Install();

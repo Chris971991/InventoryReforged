@@ -71,6 +71,8 @@ namespace ItemView
 			Slot slot;
 			RE::NiPointer<RE::NiAVObject> model;
 			bool asWorn = false;
+			// a spell's, a power's or a shout's menu display object: its particles and controllers run by the game's clock
+			bool clocked = false;
 		};
 
 		std::vector<Shown> shown;
@@ -497,10 +499,49 @@ namespace ItemView
 			return files;
 		}
 
+		// A spell, a power, a shout or a magic effect has no model of its own. The game's magic menu shows its menu display
+		// object, a STAT whose model is the effect's art (the swirling fire of Flames), and plays it by the game's clock.
+		// What it shows is the record's own (1.6.1170: Inventory3DManager 0x140928130 asks the form's BGSMenuDisplayObject,
+		// a spell's own MDOB and never an effect's): a spell without one shows nothing there. Here such a spell shows
+		// its costliest effect's, which every magic effect has
+		RE::TESBoundObject* DisplayObject(RE::TESForm& a_item)
+		{
+			if (auto* spell = a_item.As<RE::SpellItem>()) {
+				if (auto* own = spell->GetMenuDisplayObject()) {
+					return own;
+				}
+				const auto* costliest = spell->GetCostliestEffectItem();
+				auto* effect = costliest ? costliest->baseEffect : nullptr;
+				return effect ? effect->GetMenuDisplayObject() : nullptr;
+			}
+			if (auto* shout = a_item.As<RE::TESShout>()) {
+				return shout->GetMenuDisplayObject();
+			}
+			if (auto* effect = a_item.As<RE::EffectSetting>()) {
+				return effect->GetMenuDisplayObject();
+			}
+			return nullptr;
+		}
+
+		// An editor marker (a map marker's cone, an X marker) is never drawn in the game, a few magic effects name one
+		bool EditorMarker(const RE::TESModel& a_model)
+		{
+			const std::string_view path{ a_model.GetModel() };
+			const auto file = path.substr(path.find_last_of("\\/") == std::string_view::npos ? 0 : path.find_last_of("\\/") + 1);
+			return file.size() >= 6 && _strnicmp(file.data(), "marker", 6) == 0;
+		}
+
 		std::vector<File> FilesOf(RE::TESForm& a_item)
 		{
 			if (const auto* person = a_item.As<RE::TESNPC>()) {
 				return PortraitFiles(*person);
+			}
+			if (auto* shown = DisplayObject(a_item)) {
+				auto* model = skyrim_cast<RE::TESModel*>(shown);
+				if (!model || !HasFile(*model) || EditorMarker(*model)) {
+					return {};
+				}
+				return { { model->GetModel(), Kind::kItem, model->GetAsModelTextureSwap() } };
 			}
 			auto* model = WorldModel(a_item);
 			if (!model || !HasFile(*model)) {
@@ -575,6 +616,7 @@ namespace ItemView
 					WornView::FitAround(*model, facing, slot.centerX, slot.centerY, slot.size);
 					a_shown.model = model;
 					a_shown.asWorn = false;
+					a_shown.clocked = DisplayObject(*form) != nullptr;
 				}
 			}
 			if (a_shown.model) {
@@ -589,7 +631,8 @@ namespace ItemView
 		const auto files = FilesOf(a_item);
 		for (const auto& file : files) {
 			if (const auto kept = Kept(file.path)) {
-				return Made(*kept, file, LiesFlat(a_item), a_facing);
+				// effect art stands facing the camera, its file's menu marker turns it as the game does
+				return Made(*kept, file, LiesFlat(a_item) && !DisplayObject(a_item), a_facing);
 			}
 		}
 		if (!files.empty() && files.front().kind == Kind::kItem) {
@@ -970,6 +1013,27 @@ namespace ItemView
 			slot.model = model;
 			slot.asWorn = true;
 			Scene::Add(*model, Scene::Around(slot.slot.centerX, slot.slot.centerY, slot.slot.size, slot.slot.size));
+		}
+	}
+
+	// The game plays the effect art of its own preview by its clock every frame (1.6.1170: Inventory3DManager::Render
+	// 0x140927560 updates its newest model with NiUpdateData{ GetDurationOfApplicationRunTime() / 1000, dirty }), and
+	// nothing else ticks a model the plugin put in the scene. Without it the art's particles never leave their emitters
+	// and its turns and glows stand at their first frame. A slot out of sight is left alone
+	void Animate()
+	{
+		if (std::ranges::none_of(shown, [](const Shown& a_one) { return a_one.clocked && a_one.model; })) {
+			return;
+		}
+		static const auto ticking = Profile::Work("slot effect clock");
+		const Profile::Timer timer{ ticking };
+		RE::NiUpdateData update;
+		update.time = static_cast<float>(RE::GetDurationOfApplicationRunTime()) * 0.001F;
+		update.flags = RE::NiUpdateData::Flag::kDirty;
+		for (auto& one : shown) {
+			if (one.clocked && one.model && !one.model->GetAppCulled()) {
+				one.model->Update(update);
+			}
 		}
 	}
 

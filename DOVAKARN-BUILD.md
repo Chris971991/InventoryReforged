@@ -28,6 +28,13 @@ which then needs `SKSEMenuFramework.h`, see Build), except the doll's pose, whic
   `SetHidden` and `SetHiddenPiece` calls can show a hidden slot or piece again but never hide one, whatever the panel
   movie or its settings ask, and no hidden slot or piece is read back from a save. Online, a hidden piece vanished in the
   player's own game only; every other player still drew it from what the server says they wear.
+- **A spell, a power or a shout in a slot shows its effect in 3D** (`ItemView.cpp` `DisplayObject`, `Animate`;
+  `main.cpp` `MenuDisplay`, `SlotClock`), in every build: `ShowSlots` given a spell, a shout or a magic effect draws its
+  menu display object, the STAT whose art Skyrim's magic menu shows (the record's own; a spell without one, its costliest
+  effect's; never an editor marker), and every frame of the item, container, magic, barter and gift menus each such slot
+  model in sight is updated with the game's clock (`NiAVObject::Update`, time `GetDurationOfApplicationRunTime() / 1000`,
+  dirty) as `Inventory3DManager::Render` updates the game's own preview, so its particles and controllers play. Before,
+  a spell or a shout got no slot model, and no slot model was ever ticked.
 - **Skyrim 1.6.1170 only** (`main.cpp`, `SKSEPluginLoad`): on any other game version the plugin writes one line to
   `InventoryReforged.log` ("runs on Skyrim 1.6.1170 only, this game is ...") and does not load. It is built and checked
   for the one game version Dovakarn's server runs.

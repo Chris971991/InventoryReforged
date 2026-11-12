@@ -27,6 +27,8 @@ namespace ItemView
 	std::vector<std::int32_t> ShowSlots(const std::vector<Slot>& a_slots);
 	// a worn piece the game hadn't put on the body yet when its slot was shown gets another try
 	void Refresh();
+	// each frame of a menu with slots: a spell's, a power's or a shout's effect art in a slot plays by the game's clock
+	void Animate();
 	void Clear();
 	// a model the menu is done with keeps living a few seconds, the game may still be loading its textures
 	void LetGo(RE::NiPointer<RE::NiAVObject>& a_model);
