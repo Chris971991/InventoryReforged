@@ -8,6 +8,9 @@ namespace Stats
 	// the numbers of the player or of the follower the panel shows for the character window: pools and their
 	// regeneration, resistances, attack and speed
 	void FillHero(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::Actor& a_actor);
+	// every resistance of that actor with where each share of it comes from: { cap, rows: [{ key, total, sources: [{
+	// name, kind (race, perk, gear, effect, base, other), value, left (seconds, -1 for none) }] }] }
+	void FillResists(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::Actor& a_actor);
 	// the words of an effect with its strength and time put where the text asks for them
 	std::string Words(std::string a_text, float a_magnitude, float a_duration);
 }

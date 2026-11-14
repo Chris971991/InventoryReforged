@@ -39,6 +39,16 @@ which then needs `SKSEMenuFramework.h`, see Build), except the doll's pose, whic
   of its live particles are gathered and it is fitted again to their core (the 10th to 90th percentile each way, 1.05
   of the square, every shape at most 2.4 times the square; a growth outside 0.5 to 3 is a bad measure and not made;
   ribbon systems, `BSStripParticleSystem`, are left out). The log says both measures (`effect art ...`).
+- **Where each resistance comes from** (`Stats.cpp` `FillResists`; `main.cpp` `Resists`), in every build: a new movie
+  call `Resists()` answers `{ cap, rows: [{ key, total, sources: [{ name, kind, value, left }] }] }` for the six
+  resistances of the one the panel shows (magic, fire, frost, shock, poison, disease, the order of the character
+  sheet's Defense block), `cap` the game's `fPlayerMaxResistance`. Each active effect that is not inactive or dispelled
+  and modifies a resistance (value, peak value or dual value modifier; a harmful one counts against it) is one share,
+  named by where it comes from: `race` (a spell of the race's own list, named by the race: a Nord's frost is "Nord"),
+  `perk` (the ability of a perk the actor has, by the perk's name), `gear` (a worn piece's enchantment, by the name the
+  piece shows), or `effect` (a potion, spell, blessing or disease, by its own name, with `left` its seconds to go, -1
+  for none). What those do not add up to is `base` (the value's base) and `other`. Dovakarn's item menus draw it as
+  their RESISTANCES block; the panel here does not call it.
 - **Skyrim 1.6.1170 only** (`main.cpp`, `SKSEPluginLoad`): on any other game version the plugin writes one line to
   `InventoryReforged.log` ("runs on Skyrim 1.6.1170 only, this game is ...") and does not load. It is built and checked
   for the one game version Dovakarn's server runs.

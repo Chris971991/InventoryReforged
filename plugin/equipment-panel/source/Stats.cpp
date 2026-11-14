@@ -427,6 +427,187 @@ namespace Stats
 			return text;
 		}
 
+		// The six resistances in the order of the character sheet's Defense block
+		constexpr std::array kResists{
+			std::pair{ "magic", RE::ActorValue::kResistMagic },
+			std::pair{ "fire", RE::ActorValue::kResistFire },
+			std::pair{ "frost", RE::ActorValue::kResistFrost },
+			std::pair{ "shock", RE::ActorValue::kResistShock },
+			std::pair{ "poison", RE::ActorValue::kPoisonResist },
+			std::pair{ "disease", RE::ActorValue::kResistDisease },
+		};
+
+		// The perk an ability spell comes with (a perk's ability entry), read once over the load order's perks
+		const RE::BGSPerk* PerkOfAbility(const RE::MagicItem* a_spell)
+		{
+			static std::unordered_map<const RE::MagicItem*, const RE::BGSPerk*> abilities;
+			static bool read = false;
+			if (!read) {
+				read = true;
+				for (auto* perk : RE::TESDataHandler::GetSingleton()->GetFormArray<RE::BGSPerk>()) {
+					if (!perk) {
+						continue;
+					}
+					for (auto* entry : perk->perkEntries) {
+						if (entry && entry->GetType() == RE::PERK_ENTRY_TYPE::kAbility) {
+							if (const auto* ability = static_cast<RE::BGSAbilityPerkEntry*>(entry)->ability) {
+								abilities.emplace(ability, perk);
+							}
+						}
+					}
+				}
+			}
+			const auto found = abilities.find(a_spell);
+			return found != abilities.end() ? found->second : nullptr;
+		}
+
+		// Where a share of a resistance comes from: the race, a perk, a worn piece's enchantment, an effect on the actor (a
+		// potion, a spell, a blessing, a disease) with its time left, or what no effect explains (the actor value's base,
+		// and the rest of the total)
+		struct ResistSource
+		{
+			const void* key;
+			std::string name;
+			const char* kind;
+			float value;
+			float left;
+		};
+
+		int KindOrder(std::string_view a_kind)
+		{
+			constexpr std::array kOrder{ "race", "perk", "gear", "effect", "base", "other" };
+			for (std::size_t i = 0; i < kOrder.size(); ++i) {
+				if (a_kind == kOrder[i]) {
+					return static_cast<int>(i);
+				}
+			}
+			return static_cast<int>(kOrder.size());
+		}
+
+		// what an active effect adds to one actor value: its magnitude on the value it modifies (a dual one's second value
+		// by its weight), taken away when the effect is harmful (Weakness to Fire)
+		float ShareOf(const RE::ActiveEffect& a_active, const RE::EffectSetting& a_base, RE::ActorValue a_value)
+		{
+			using Archetype = RE::EffectSetting::Archetype;
+			const auto type = a_base.GetArchetype();
+			if (type != Archetype::kValueModifier && type != Archetype::kPeakValueModifier && type != Archetype::kDualValueModifier) {
+				return 0.0F;
+			}
+			float share = 0.0F;
+			if (a_base.data.primaryAV == a_value) {
+				share += a_active.magnitude;
+			}
+			if (type == Archetype::kDualValueModifier && a_base.data.secondaryAV == a_value) {
+				share += a_active.magnitude * a_base.data.secondAVWeight;
+			}
+			return a_base.IsDetrimental() ? -share : share;
+		}
+
+		// The worn piece an enchantment's effect comes from, by the name the player sees on it (a piece the player
+		// enchanted and named keeps that name)
+		std::string GearName(RE::Actor& a_actor, RE::TESBoundObject* a_source)
+		{
+			if (auto* entry = WornEntry(a_actor, a_source)) {
+				if (const char* shown = entry->GetDisplayName(); shown && *shown) {
+					return shown;
+				}
+			}
+			const char* name = a_source->GetName();
+			return name ? name : "";
+		}
+
+		// every resistance's total and each source of it, as the sheet and the item menus show them
+		void FillResistSources(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::Actor& a_actor)
+		{
+			auto* values = a_actor.AsActorValueOwner();
+			auto* target = a_actor.GetMagicTarget();
+			auto* effects = target ? target->GetActiveEffectList() : nullptr;
+			const auto* race = a_actor.GetRace();
+			static RE::BSSimpleList<RE::ActiveEffect*> none;
+			std::array<std::vector<ResistSource>, kResists.size()> found;
+			const auto add = [](std::vector<ResistSource>& a_list, const void* a_key, std::string a_name, const char* a_kind, float a_value, float a_left) {
+				auto same = std::ranges::find_if(a_list, [&](const ResistSource& a_source) { return a_source.key == a_key && std::string_view(a_source.kind) == a_kind; });
+				if (same == a_list.end()) {
+					a_list.push_back({ a_key, std::move(a_name), a_kind, a_value, a_left });
+				} else {
+					same->value += a_value;
+					same->left = std::max(same->left, a_left);
+				}
+			};
+			for (auto* active : effects ? *effects : none) {
+				const auto* base = active && active->effect ? active->effect->baseEffect : nullptr;
+				if (!base || !active->spell || active->flags.any(RE::ActiveEffect::Flag::kInactive, RE::ActiveEffect::Flag::kDispelled)) {
+					continue;
+				}
+				for (std::size_t i = 0; i < kResists.size(); ++i) {
+					const float share = ShareOf(*active, *base, kResists[i].second);
+					if (share == 0.0F) {
+						continue;
+					}
+					auto* spell = active->spell;
+					const char* spellName = spell->GetName();
+					std::string named = spellName && *spellName ? spellName : (base->GetName() ? base->GetName() : "");
+					if (RaceSpell(race, spell)) {
+						add(found[i], race, race->GetName() ? race->GetName() : named, "race", share, -1.0F);
+					} else if (const auto* perk = PerkOfAbility(spell); perk && a_actor.HasPerk(const_cast<RE::BGSPerk*>(perk))) {
+						add(found[i], perk, perk->GetName() && *perk->GetName() ? perk->GetName() : named, "perk", share, -1.0F);
+					} else if (spell->GetSpellType() == RE::MagicSystem::SpellType::kEnchantment && active->source) {
+						add(found[i], active->source, GearName(a_actor, active->source), "gear", share, -1.0F);
+					} else {
+						const float left = active->duration > 0.0F ? active->duration - active->elapsedSeconds : -1.0F;
+						add(found[i], spell, named, "effect", share, left);
+					}
+				}
+			}
+			RE::GFxValue rows;
+			a_movie.CreateArray(&rows);
+			for (std::size_t i = 0; i < kResists.size(); ++i) {
+				auto& list = found[i];
+				const float total = values->GetActorValue(kResists[i].second);
+				const float base = values->GetBaseActorValue(kResists[i].second);
+				float counted = 0.0F;
+				for (const auto& source : list) {
+					counted += source.value;
+				}
+				if (std::abs(base) >= 0.5F) {
+					list.push_back({ nullptr, "", "base", base, -1.0F });
+					counted += base;
+				}
+				// what the effects and the base do not add up to (a script that set the value, a cap the game keeps)
+				if (std::abs(total - counted) >= 0.5F) {
+					list.push_back({ nullptr, "", "other", total - counted, -1.0F });
+				}
+				std::ranges::stable_sort(list, [](const ResistSource& a_one, const ResistSource& a_two) {
+					const int one = KindOrder(a_one.kind);
+					const int two = KindOrder(a_two.kind);
+					return one != two ? one < two : std::abs(a_one.value) > std::abs(a_two.value);
+				});
+				RE::GFxValue row;
+				RE::GFxValue sources;
+				a_movie.CreateObject(&row);
+				a_movie.CreateArray(&sources);
+				row.SetMember("key", kResists[i].first);
+				row.SetMember("total", total);
+				for (const auto& source : list) {
+					if (std::abs(source.value) < 0.5F) {
+						continue;
+					}
+					RE::GFxValue one;
+					RE::GFxValue name;
+					a_movie.CreateObject(&one);
+					a_movie.CreateString(&name, source.name.c_str());
+					one.SetMember("name", name);
+					one.SetMember("kind", source.kind);
+					one.SetMember("value", source.value);
+					one.SetMember("left", source.left);
+					sources.PushBack(one);
+				}
+				row.SetMember("sources", sources);
+				rows.PushBack(row);
+			}
+			a_object.SetMember("rows", rows);
+		}
+
 		void FillSkills(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::ActorValueOwner& a_values)
 		{
 			RE::GFxValue skills;
@@ -463,14 +644,6 @@ namespace Stats
 		a_object.SetMember("armorBase", Setting("fArmorBaseFactor", 0.03F));
 		a_object.SetMember("armorCap", Setting("fMaxArmorRating", 80.0F));
 		a_object.SetMember("resistCap", Setting("fPlayerMaxResistance", 85.0F));
-		constexpr std::array kResists{
-			std::pair{ "magic", RE::ActorValue::kResistMagic },
-			std::pair{ "fire", RE::ActorValue::kResistFire },
-			std::pair{ "frost", RE::ActorValue::kResistFrost },
-			std::pair{ "shock", RE::ActorValue::kResistShock },
-			std::pair{ "poison", RE::ActorValue::kPoisonResist },
-			std::pair{ "disease", RE::ActorValue::kResistDisease },
-		};
 		for (const auto& [name, value] : kResists) {
 			a_object.SetMember(name, values->GetActorValue(value));
 		}
@@ -524,6 +697,13 @@ namespace Stats
 		if (skills && skills->data && skills->data->levelThreshold > 0.0F) {
 			a_object.SetMember("toNextLevel", skills->data->xp / skills->data->levelThreshold);
 		}
+	}
+
+	void FillResists(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::Actor& a_actor)
+	{
+		a_movie.CreateObject(&a_object);
+		a_object.SetMember("cap", Setting("fPlayerMaxResistance", 85.0F));
+		FillResistSources(a_movie, a_object, a_actor);
 	}
 
 	void Fill(RE::GFxMovie& a_movie, RE::GFxValue& a_object, RE::FormID a_item)

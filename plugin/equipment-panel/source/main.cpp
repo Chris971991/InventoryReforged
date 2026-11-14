@@ -632,6 +632,17 @@ namespace
 		}
 	};
 
+	// Resists() is an object with every resistance of the one the panel shows and where each share of it comes from
+	struct ResistsOfShown
+	{
+		static void Run(Params& a_params)
+		{
+			if (const auto shown = Subject::Get(); shown && (shown->IsPlayerRef() || shown->Is3DLoaded()) && a_params.retVal && a_params.movie) {
+				Stats::FillResists(*a_params.movie, *a_params.retVal, *shown);
+			}
+		}
+	};
+
 	// Subject() is who the panel of this menu shows, settled as the menu loaded: an object with player (true for the
 	// player), name and formId
 	struct ShownActor
@@ -1199,6 +1210,7 @@ namespace
 		AddFunction<ContextOver>(a_view, a_root, "ContextOver");
 		AddFunction<ItemStats>(a_view, a_root, "Stats");
 		AddFunction<HeroStats>(a_view, a_root, "HeroStats");
+		AddFunction<ResistsOfShown>(a_view, a_root, "Resists");
 		AddFunction<ShownActor>(a_view, a_root, "Subject");
 		AddFunction<NearCompanions>(a_view, a_root, "Companions");
 		AddFunction<SwitchCompanion>(a_view, a_root, "SwitchTo");
